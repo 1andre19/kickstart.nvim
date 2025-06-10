@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -99,10 +99,9 @@ vim.g.have_nerd_font = false
 --  For more options, you can see `:help option-list`
 
 -- Make line numbers default
-vim.opt.number = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
--- vim.opt.relativenumber = true
+vim.opt.relativenumber = true
 
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.opt.mouse = 'a'
@@ -120,6 +119,11 @@ end)
 
 -- Enable break indent
 vim.opt.breakindent = true
+
+-- tabs
+vim.opt.tabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.softtabstop = 4
 
 -- Save undo history
 vim.opt.undofile = true
@@ -193,6 +197,10 @@ vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left wind
 vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
+
+-- For moving around buffers
+-- vim.keymap.set('n', '<C-S-l>', '<Cmd>BufferPrevious<CR>', { desc = 'Move to previous buffer' })
+-- vim.keymap.set('n', '<C-S-h>', '<Cmd>BufferNext<CR>', { desc = 'Move to next buffer' })
 
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
 -- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
@@ -464,6 +472,7 @@ require('lazy').setup({
       library = {
         -- Load luvit types when the `vim.uv` word is found
         { path = '${3rd}/luv/library', words = { 'vim%.uv' } },
+        { path = '${3rd}/love2d/library' },
       },
     },
   },
@@ -663,9 +672,6 @@ require('lazy').setup({
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
-        -- clangd = {},
-        -- gopls = {},
-        -- pyright = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -673,8 +679,14 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
-        -- ts_ls = {},
-        --
+        ts_ls = {},
+        cmake = {},
+
+        clangd = {},
+        gopls = {
+          gofumpt = true,
+        },
+        pyright = {},
 
         lua_ls = {
           -- cmd = { ... },
@@ -736,7 +748,7 @@ require('lazy').setup({
       {
         '<leader>f',
         function()
-          require('conform').format { async = true, lsp_format = 'fallback' }
+          require('conform').format { async = true, lsp_fallback = true }
         end,
         mode = '',
         desc = '[F]ormat buffer',
@@ -749,22 +761,29 @@ require('lazy').setup({
         -- have a well standardized coding style. You can add additional
         -- languages here or re-enable it for the disabled ones.
         local disable_filetypes = { c = true, cpp = true }
-        if disable_filetypes[vim.bo[bufnr].filetype] then
-          return nil
-        else
-          return {
-            timeout_ms = 500,
-            lsp_format = 'fallback',
-          }
-        end
+        return {
+          timeout_ms = 500,
+          lsp_fallback = not disable_filetypes[vim.bo[bufnr].filetype],
+        }
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
-        --
+        python = { 'isort', 'black' },
+        sh = { 'shfmt' },
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
+
+        c = { 'clang_format' },
+        cpp = { 'clang_format' },
+      },
+      formatters = {
+        clang_format = {
+          prepend_args = { '--style=file', '--fallback-style=Webkit' },
+        },
+        shfmt = {
+          prepend_args = { '-i', '4' },
+        },
       },
     },
   },
@@ -873,20 +892,33 @@ require('lazy').setup({
     -- change the command in the config to whatever the name of that colorscheme is.
     --
     -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
-    'folke/tokyonight.nvim',
+    'EdenEast/nightfox.nvim',
     priority = 1000, -- Make sure to load this before all the other start plugins.
     config = function()
       ---@diagnostic disable-next-line: missing-fields
-      require('tokyonight').setup {
+      require('nightfox').setup {
         styles = {
           comments = { italic = false }, -- Disable italics in comments
+        },
+        options = {
+          transparent = true,
         },
       }
 
       -- Load the colorscheme here.
       -- Like many other themes, this one has different styles, and you could load
       -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-      vim.cmd.colorscheme 'tokyonight-night'
+      --vim.cmd.colorscheme 'carbonfox'
+    end,
+  },
+  {
+    'ellisonleao/gruvbox.nvim',
+    priority = 1000,
+    config = function()
+      require('gruvbox').setup {
+        transparent_mode = false,
+      }
+      vim.cmd.colorscheme 'gruvbox'
     end,
   },
 
@@ -968,9 +1000,12 @@ require('lazy').setup({
   -- require 'kickstart.plugins.debug',
   -- require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.origami',
+  require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.barbar',
+  require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.starter',
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
